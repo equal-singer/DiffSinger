@@ -112,4 +112,4 @@ class FastSpeech2Acoustic(nn.Module):
             condition, key_shift=key_shift, speed=speed, **kwargs
         )
 
-        return condition
+        return condition, mel2ph_

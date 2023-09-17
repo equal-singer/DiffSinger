@@ -12,8 +12,9 @@ from basics.base_vocoder import BaseVocoder
 from modules.losses.diff_loss import DiffusionNoiseLoss
 from modules.toplevel import DiffSingerAcoustic
 from modules.vocoders.registry import get_vocoder_cls
+from modules.fastspeech.tts_modules import mel2ph_to_dur
 from utils.hparams import hparams
-from utils.plot import spec_to_figure, curve_to_figure
+from utils.plot import spec_to_figure, curve_to_figure, dur_to_figure
 
 matplotlib.use('Agg')
 
@@ -103,7 +104,7 @@ class AcousticTask(BaseTask):
         )
 
         if infer:
-            return output  # mel_pred
+            return output  # mel_pred, mel2ph_pred
         else:
             x_recon, x_noise = output
             mel_loss = self.mel_loss(x_recon, x_noise, nonpadding=(mel2ph > 0).unsqueeze(-1).float())
@@ -126,11 +127,12 @@ class AcousticTask(BaseTask):
 
         if batch_idx < hparams['num_valid_plots'] \
                 and (self.trainer.distributed_sampler_kwargs or {}).get('rank', 0) == 0:
-            mel_pred = self.run_model(sample, infer=True)
+            mel_pred, mel2ph_pred = self.run_model(sample, infer=True)
 
             if self.use_vocoder:
                 self.plot_wav(batch_idx, sample['mel'], mel_pred, f0=sample['f0'])
             self.plot_mel(batch_idx, sample['mel'], mel_pred, name=f'diffmel_{batch_idx}')
+            self.plot_dur(batch_idx, sample['mel2ph'], mel2ph_pred, txt=sample['tokens'])
 
         return losses, sample['size']
 
@@ -162,3 +164,10 @@ class AcousticTask(BaseTask):
         gt_curve = gt_curve[0].cpu().numpy()
         pred_curve = pred_curve[0].cpu().numpy()
         self.logger.experiment.add_figure(name, curve_to_figure(gt_curve, pred_curve), self.global_step)
+
+    def plot_dur(self, batch_idx, mel2ph, pred_mel2ph, txt=None):
+        name = f'dur_{batch_idx}'
+        gt_dur = mel2ph_to_dur(mel2ph, mel2ph.max())
+        pred_dur = mel2ph_to_dur(pred_mel2ph[0], pred_mel2ph[0].max())
+        txt = self.phone_encoder.decode(txt[0].cpu().numpy()).split()
+        self.logger.experiment.add_figure(name, dur_to_figure(gt_dur, pred_dur, txt), self.global_step)
