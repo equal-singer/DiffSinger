@@ -50,7 +50,7 @@ class DiffSingerAcoustic(ParameterAdaptorModule, CategorizedModule):
             self, txt_tokens, mel2ph, f0, key_shift=None, speed=None,
             spk_embed_id=None, gt_mel=None, infer=True, **kwargs
     ):
-        condition, pred_mel2ph = self.fs2(
+        condition = self.fs2(
             txt_tokens, mel2ph, f0, key_shift=key_shift, speed=speed,
             spk_embed_id=spk_embed_id, **kwargs
         )
@@ -58,7 +58,7 @@ class DiffSingerAcoustic(ParameterAdaptorModule, CategorizedModule):
         if infer:
             mel_pred = self.diffusion(condition, infer=True)
             mel_pred *= ((mel2ph > 0).float()[:, :, None])
-            return mel_pred, pred_mel2ph
+            return mel_pred
         else:
             x_recon, noise = self.diffusion(condition, gt_spec=gt_mel, infer=False)
             return x_recon, noise
